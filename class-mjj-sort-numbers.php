@@ -71,16 +71,20 @@ class MJJ_Sort_Numbers {
 			$post_sort_options = get_option( 'mjj_sort_' . $post_type . '_metakeys', false );
 			
 			if( !empty( $post_sort_options ) ){
-				$sort_options = array_merge( $sort_options, $post_sort_options );
+				$sort_options = array_merge( (array)$sort_options, (array)$post_sort_options );
 			}
 		}
 
-		$comment_sort_options = get_option( 'mjj_sort_comment_metakeys', false );
+		$comment_sort_options = (array)get_option( 'mjj_sort_comment_metakeys', false );
 
-		$sort_options = array_merge( $post_sort_options, $comment_sort_options );
+		if( !empty( $comment_sort_options ) ){
+			$sort_options = array_merge( $sort_options, $comment_sort_options );
+		}
 		
-		foreach( $sort_options as $query_var => $metakey ){
-			add_rewrite_tag('%' . $query_var . '%', '([^&]+)');
+		if( !empty( $sort_options ) && is_array( $sort_options ) ){
+			foreach( $sort_options as $query_var => $metakey ){
+				add_rewrite_tag('%' . $query_var . '%', '([^&]+)');
+			}
 		}
 	}
 
@@ -99,23 +103,25 @@ class MJJ_Sort_Numbers {
 		$sort_var = get_option( 'mjj_sort_' . $post_type . '_metakeys', false );
 		$sort_order = '';
 
-		foreach( $sort_var as $var => $key ){
-			// you can only use asc or desc 
-			// this will return the last key / value pair which has a query variable in the options array
-			if( isset( $wp_query->query_vars[ $var ] ) ){   
-				$sort_order = $wp_query->query_vars[ $var ];
+		if( !empty( $sort_var ) ){
+			foreach( $sort_var as $var => $key ){
+				// you can only use asc or desc 
+				// this will return the last key / value pair which has a query variable in the options array
+				if( isset( $wp_query->query_vars[ $var ] ) ){   
+					$sort_order = $wp_query->query_vars[ $var ];
+				}
 			}
-		}
-		
-		if( $sort_order === 'asc' ){
-			add_filter('split_the_query', function( $return ){ return true; }, 10, 1 );
-			add_filter('posts_request_ids', array( 'MJJ_Sort_Numbers', 'post_sort_asc' ), 10, 2 );
-
-		}
-		
-		elseif( $sort_order == 'desc' ){
-			add_filter('split_the_query', function( $return ){ return true; }, 10, 1 );
-			add_filter('posts_request_ids', array( 'MJJ_Sort_Numbers', 'post_sort_desc' ), 10, 2 );
+			
+			if( $sort_order === 'asc' ){
+				add_filter('split_the_query', function( $return ){ return true; }, 10, 1 );
+				add_filter('posts_request_ids', array( 'MJJ_Sort_Numbers', 'post_sort_asc' ), 10, 2 );
+	
+			}
+			
+			elseif( $sort_order == 'desc' ){
+				add_filter('split_the_query', function( $return ){ return true; }, 10, 1 );
+				add_filter('posts_request_ids', array( 'MJJ_Sort_Numbers', 'post_sort_desc' ), 10, 2 );
+			}
 		}
 
 		return $query;
