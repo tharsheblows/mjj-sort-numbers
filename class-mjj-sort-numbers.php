@@ -215,17 +215,10 @@ class MJJ_Sort_Numbers {
 
 		global $wpdb;
 
-		
-			error_log( $post_id, 0 );
-			error_log( $key, 0 );
-			error_log( $value, 0 );
-
 		if( !empty( $post_id ) && !empty( $key ) && !empty( $value ) ){
 
 			
 			$current_sort_value = MJJ_Sort_Numbers::get_sort_value( $post_id, $key );
-
-			error_log( $current_sort_value, 0 );
 
 			if( $current_sort_value !== null ){
 				$sort_id = $current_sort_value->ID;
@@ -283,16 +276,23 @@ class MJJ_Sort_Numbers {
 
 	}
 
-	public static function change_status_to_publish( $old_status, $new_status, $post ){
+	public static function change_status_to_publish( $old_status = null, $new_status = null, $post = null ){
+
+		if( empty( $old_status) || empty( $new_status ) || empty( $post ) ){
+			return;
+		}
 		
 		$post_sort_options = get_option( 'mjj_sort_' . $post->post_type . '_metakeys', false );
+
+		if( !empty( $post_sort_options ) ){
 		
-		foreach( $post_sort_options as $query_var => $registered_metakey ){
-			
-			$post_sort_value = get_post_meta( $post->ID, $registered_metakey, true );
-			
-			if( !empty( $post_sort_meta ) ){
-				MJJ_Sort_Numbers::update_sort_numbers( $post->ID, $post->post_date, $registered_metakey, $post_sort_meta );
+			foreach( $post_sort_options as $query_var => $registered_metakey ){
+				
+				$post_sort_value = get_post_meta( $post->ID, $registered_metakey, true );
+				
+				if( !empty( $post_sort_meta ) ){
+					MJJ_Sort_Numbers::update_sort_numbers( $post->ID, $post->post_date, $registered_metakey, $post_sort_meta );
+				}
 			}
 		}
 	}
