@@ -25,9 +25,11 @@ class MJJ_Sort_Numbers {
 		// 
 		// these are around here : /Users/jjjay/vagrant-local/www/bloodsugarfix/htdocs/wp-includes/meta-functions.php L 428
 		
-		add_action('init', array( 'MJJ_Sort_Numbers', 'sorting_rewrite_tag' ), 10, 0);
+		add_action('init', array( 'MJJ_Sort_Numbers', 'sorting_rewrite_tag' ), 10, 0 );
 
-		add_action( 'pre_get_posts', array( 'MJJ_Sort_Numbers', 'build_post_query'), 10, 1);
+		//add_action( 'pre_get_posts', array( 'MJJ_Sort_Numbers', 'build_post_query'), 10, 1);
+		add_filter('split_the_query',  array( 'MJJ_Sort_Numbers', 'split_query' ), 10, 2 );
+		add_filter('posts_request_ids', array( 'MJJ_Sort_Numbers', 'post_sort' ), 10, 2 );
 
 		// update sort table when meta updated
 		add_action( 'updated_post_meta', array( 'MJJ_Sort_Numbers', 'add_to_sort_table' ), 10, 4 );
@@ -88,94 +90,69 @@ class MJJ_Sort_Numbers {
 		}
 	}
 
-	public static function build_post_query( $query ){
+	public static function split_query( $split, $query ){
 
-		global $wp_query;
+		$post_type = ( isset( $query->query['post_type' ] ) && !is_array( $query->query['post_type' ] ) ) ? esc_attr( $query->query['post_type' ] ) : null;
+		
+		$sort_var = ( !empty( $post_type ) ) ? get_option( 'mjj_sort_' . $post_type . '_metakeys', false ) : null;
 
-		$can_sort = ( is_archive() || is_post_type_archive() ) ? true : false;
-
-		if( ! apply_filters( 'mjj_can_sort', $can_sort, $query ) ){
-			return $query;
+		if( !empty( $sort_var ) && $query->is_main_query() && array_intersect_key( $sort_var, $query->query) ){
+			return $split;
 		}
+		return false;
+	}
 
+
+	public static function post_sort( $request, $query ){
+		global $wpdb;
+		
 		$post_type = ( isset( $query->query['post_type' ] ) ) ? esc_attr( $query->query['post_type' ] ) : 'post';
 
 		$sort_var = get_option( 'mjj_sort_' . $post_type . '_metakeys', false );
 		$sort_order = '';
 
+		$posts_per_page = ( isset( $query->query_vars[ 'posts_per_page' ] ) ) ? (int)$query->query_vars[ 'posts_per_page' ] : 25 ;
+		$offset =  ( isset( $query->query[ 'paged' ] ) ) ? (int)$query->query[ 'paged' ] : 1;
+		$limit =  ( $offset - 1 ) * $posts_per_page . ',' . $posts_per_page;
+
 		if( !empty( $sort_var ) ){
 			foreach( $sort_var as $var => $key ){
 				// you can only use asc or desc 
 				// this will return the last key / value pair which has a query variable in the options array
-				if( isset( $wp_query->query_vars[ $var ] ) ){   
-					$sort_order = $wp_query->query_vars[ $var ];
+				if( isset( $query->query_vars[ $var ] ) ){   
+					$sort_order = $query->query_vars[ $var ];
 				}
 			}
 			
 			if( $sort_order === 'asc' ){
-				add_filter('split_the_query', function( $return ){ return true; }, 10, 1 );
-				add_filter('posts_request_ids', array( 'MJJ_Sort_Numbers', 'post_sort_asc' ), 10, 2 );
+				$sort_request_ids = $wpdb->prepare(
+					"
+        				SELECT SQL_CALC_FOUND_ROWS object_id
+       					FROM    wp_mjj_sort_posts sort
+    					WHERE meta_key = '%s'
+        				ORDER BY sort_value ASC, post_date DESC
+        				LIMIT {$limit}
+					",
+					'_mjj_recipe_rating'
+				);
 	
 			}
 			
-			elseif( $sort_order == 'desc' ){
-				add_filter('split_the_query', function( $return ){ return true; }, 10, 1 );
-				add_filter('posts_request_ids', array( 'MJJ_Sort_Numbers', 'post_sort_desc' ), 10, 2 );
+			elseif( $sort_order === 'desc' ){
+				$sort_request_ids = $wpdb->prepare(
+					"
+        				SELECT SQL_CALC_FOUND_ROWS object_id
+       					FROM    wp_mjj_sort_posts sort
+    					WHERE meta_key = '%s'
+        				ORDER BY sort_value DESC, post_date DESC
+        				LIMIT {$limit}
+					",
+					'_mjj_recipe_rating'
+				);
 			}
+
+			return $sort_request_ids;
 		}
-
-		return $query;
-	}
-
-	
-	public static function post_sort_desc( $request, $query ){
-
-		global $wpdb;
-
-		$posts_per_page = ( isset( $query->query_vars[ 'posts_per_page' ] ) ) ? (int)$query->query_vars[ 'posts_per_page' ] : 25 ;
-
-		$offset =  ( isset( $query->query[ 'paged' ] ) ) ? (int)$query->query[ 'paged' ] : 1;
-
-		$limit =  ( $offset - 1 ) * $posts_per_page . ',' . $posts_per_page;
-
-		$sort_request_ids = $wpdb->prepare(
-			"
-        		SELECT SQL_CALC_FOUND_ROWS object_id
-       			FROM    wp_mjj_sort_posts sort
-    			WHERE meta_key = '%s'
-        		ORDER BY sort_value DESC, post_date DESC
-        		LIMIT {$limit}
-			",
-			'_mjj_recipe_rating'
-			);
-
-		return $sort_request_ids;
-
-	}
-
-	public static function post_sort_asc( $request, $query ){
-
-		global $wpdb;
-
-		$posts_per_page = ( isset( $query->query_vars[ 'posts_per_page' ] ) ) ? (int)$query->query_vars[ 'posts_per_page' ] : 25 ;
-
-		$offset =  ( isset( $query->query[ 'paged' ] ) ) ? (int)$query->query[ 'paged' ] : 1;
-
-		$limit =  ( $offset - 1 ) * $posts_per_page . ',' . $posts_per_page;
-
-		$sort_request_ids = $wpdb->prepare(
-			"
-        		SELECT SQL_CALC_FOUND_ROWS object_id
-       			FROM    wp_mjj_sort_posts sort
-    			WHERE meta_key = '%s'
-        		ORDER BY sort_value ASC, post_date ASC
-        		LIMIT {$limit}
-			",
-			'_mjj_recipe_rating'
-			);
-
-		return $sort_request_ids;
-
 	}
 
 	// ok what functions do I need?
